@@ -1,8 +1,8 @@
 ---
 name: last30days
 version: "3.26.0"
-description: "Research what people actually say about any topic in the last 30 days. Pulls posts and engagement from Reddit, X, YouTube, TikTok, Hacker News, Polymarket, GitHub, and the web. Includes a doctor health check to diagnose broken or missing sources."
-argument-hint: 'last30days nvidia earnings reaction | last30days AI video tools | last30days what users want in react'
+description: "Research what people actually say about any topic in the last 30 days, or any window you choose (a week, a quarter, a year, or exact dates). Pulls posts and engagement from Reddit, X, YouTube, TikTok, Hacker News, Polymarket, GitHub, and the web. Arabic-aware with Middle East coverage (UAE, Jordan, Saudi, GCC, Levant, Egypt, Maghreb) via --region. Includes a doctor health check to diagnose broken or missing sources."
+argument-hint: 'last30days nvidia earnings reaction | last30days RTA Dubai autonomous taxis --region=uae | last30days الذكاء الاصطناعي في الحكومة --region=jordan --period=3m'
 allowed-tools: Bash, Read, Write, AskUserQuestion, WebSearch
 homepage: https://github.com/mvanhorn/last30days-skill
 repository: https://github.com/mvanhorn/last30days-skill
@@ -814,6 +814,27 @@ Common patterns:
 - `REGISTER = [default | exec | dev | creator | eli5]` from an explicit `--register` argument, otherwise `LAST30DAYS_REGISTER`, otherwise `default`. A legacy `ELI5_MODE=true` config means `eli5` when no register was selected. Register words are controls, not part of TOPIC.
 - `TOPIC_A = [first item]` (only if COMPARISON)
 - `TOPIC_B = [second item]` (only if COMPARISON)
+- `WINDOW = [engine flag for the research period]` (see "Research window" below; empty means the default 30 days)
+- `REGION = [--region value]` (see "Middle East / Arabic focus" below; empty means no regional focus)
+
+**Research window (not only the last 30 days).** The window is a control, not part of TOPIC. Map the user's wording to exactly ONE engine flag and strip the wording from TOPIC:
+- "last week", "this week", "past 7 days", "آخر أسبوع", "هذا الأسبوع" → `--period=7d`
+- "last two weeks", "آخر أسبوعين" → `--period=2w`
+- "last month", "آخر شهر" (or nothing said) → no flag (default 30 days)
+- "last 3 months", "this quarter", "آخر ثلاثة أشهر", "الربع الأخير" → `--period=3m`
+- "last 6 months", "آخر ستة أشهر" → `--period=6m`
+- "last year", "past 12 months", "آخر سنة", "العام الماضي" → `--period=1y`
+- "last N days" → `--days=N`
+- An explicit range ("from January to March 2026", "من يناير إلى مارس") → `--from=2026-01-01 --as-of=2026-03-31`; "since March 1" → `--from=2026-03-01`
+- A persistent default can be set once with `LAST30DAYS_DEFAULT_DAYS` (e.g. `90` or `3m`) in `~/.config/last30days/.env`.
+Never combine `--days`, `--period` and `--from` (the engine exits 2). In the confirm line and synthesis, describe the actual window ("the last 3 months", "Jan 1 - Mar 31 2026") instead of "the last 30 days" whenever WINDOW is set. Windows beyond ~90 days return fewer social posts (Reddit/X/TikTok search favors recent content) and more web/news coverage; mention that once if the user asks for a year or more.
+
+**Middle East / Arabic focus (`--region`).** Pass `--region` when ANY of these hold, and keep the country names in TOPIC only when they are the subject itself:
+- The user names a country, city, or group in the Arab world: UAE / Dubai / Abu Dhabi → `uae`; Jordan / Amman → `jordan`; Saudi / KSA / Riyadh → `saudi`; Qatar, Kuwait, Bahrain, Oman, Egypt, Lebanon, Iraq, Palestine, Syria, Morocco, Tunisia, Algeria, Libya, Sudan, Yemen → their name; "the Gulf" / "GCC" → `gcc`; "the Levant" → `levant`; "North Africa" / "Maghreb" → `north-africa` / `maghreb`; "Middle East", "MENA", "Arab world", "الوطن العربي" → `mena`. Combine with commas: "UAE and Jordan" → `--region=uae,jordan`.
+- The topic is an entity rooted in the region (RTA Dubai, Emirates airline, Aramco, NEOM, Careem, Talabat, Zain Jordan, Orange Jordan, Aramex...) → that entity's home country.
+- The topic is written in Arabic and the user names no country → `--region=mena`.
+- `LAST30DAYS_REGION` in `.env` sets a default region for every run; an explicit `--region` overrides it.
+What `--region` does: adds the region's subreddits (r/dubai, r/UAE, r/jordan, r/amman, r/saudiarabia, r/arabs, r/MiddleEast...) on top of the ones you resolve in Step 0.55, runs a second web pass restricted to national and pan-Arab news sites (Gulf News, Khaleej Times, The National, WAM, Al Bayan, Jordan Times, Al Ghad, Petra, Arab News, Asharq Al-Awsat, Al Jazeera, Al Arabiya, Sky News Arabia, Zawya...) when a web search key is configured, and sets the Perplexity and Meta Ads country for single-country runs. It does not translate anything: Arabic coverage comes from the Arabic subqueries YOU write in the plan (Step 0.75).
 
 **Confirm the topic with a branded, truthful message. Build ACTIVE_SOURCES_LIST from the engine's own source diagnostic — do NOT infer availability by checking env vars or `.env`.** The engine resolves credentials at runtime from several places (process environment, `.env`, macOS Keychain, etc.), so a config-file check silently under-reports sources whenever a key is resolved at runtime rather than written literally in `.env`. Run the engine's `--diagnose` and read its result:
 
@@ -845,6 +866,8 @@ For GENERAL / NEWS / RECOMMENDATIONS / PROMPTING queries:
 ```
 /last30days - searching {ACTIVE_SOURCES_LIST} for what people are saying about {TOPIC}.
 ```
+
+When WINDOW or REGION is set, append them to the same line, e.g. `... about {TOPIC} over the last 3 months, focused on the UAE and Jordan.`
 
 For COMPARISON queries:
 ```
@@ -1499,6 +1522,8 @@ Only show lines for platforms where something was resolved. Skip empty lines. On
 - For predictions: include Polymarket in sources
 - For how_to: prioritize YouTube (tutorials) and Reddit (guides)
 - Primary subquery weight = 1.0, secondary = 0.6-0.8, peripheral = 0.3-0.5
+- **Arabic subquery (mandatory when REGION is set or the topic is in Arabic).** Add one subquery labelled `arabic` whose `search_query` is the topic written the way Arabic speakers title posts in the region (Modern Standard Arabic; add the common Gulf/Levantine spelling when it differs, e.g. `هيئة الطرق والمواصلات دبي`, `المترو عمّان`), with `sources` = the active ones among `x`, `youtube`, `tiktok`, `instagram`, `grounding` (Reddit and Hacker News are English-dominant; leave them out), weight 0.8, and an English `ranking_query`. When the topic itself is in Arabic, do the reverse: keep the Arabic primary and add an `english` subquery (weight 0.7) with the English name of the entity, so English-language Gulf media and Reddit are covered. Keep proper nouns that are usually written in Latin script (ChatGPT, Power BI, Careem) in Latin script inside the Arabic query.
+- **Regional anchoring.** When REGION is set and the topic is generic ("AI in government", "smart mobility"), anchor at least the primary and one secondary subquery with the country/city ("ai government uae", "smart mobility dubai") so global results don't drown the regional ones. Don't anchor when the entity is already regional (RTA, NEOM).
 
 **Available sources (include every active one in the primary subquery):** use the engine's `ACTIVE_SOURCES_LIST`. The normal candidates are reddit, x, youtube, tiktok, instagram, hackernews, and polymarket; X remains part of the normal set when active and is simply omitted when unavailable. Optional: bluesky, truthsocial, threads, pinterest, grounding (web search - only if user has Brave/Exa/Serper key), digg (Digg clusters - only if `digg-pp-cli` is on PATH), amazon (buyer reviews - only if `brightdata` is on PATH and logged in; see Step 0.5e), meta_ads (a brand's live Meta ad creatives - only if `SCRAPECREATORS_API_KEY` is set and the topic is a brand; see Step 0.5f)
 
@@ -1712,6 +1737,9 @@ For ALL query types:
 
 **Options** (passed through from user's command):
 - `--days=N` → Look back N days instead of 30 (e.g., `--days=7` for weekly roundup)
+- `--period=7d|2w|3m|6m|1y|week|month|quarter|year` → Look back over a named duration
+- `--from=YYYY-MM-DD [--as-of=YYYY-MM-DD]` → Custom window from a start date to today (or to the `--as-of` date)
+- `--region=uae|jordan|saudi|gcc|levant|mena|...` → Middle East / Arab-world focus (comma-separate to combine)
 - `--quick` → Faster, fewer sources (8-12 each)
 - (default) → Balanced (20-30 each)
 - `--deep` → Comprehensive (50-70 Reddit, 40-60 X)
@@ -2212,7 +2240,8 @@ I've compared {TOPIC_A} vs {TOPIC_B} using the latest community data. Some thing
 - [Deep dive into {TOPIC_A} alone with /last30days {TOPIC_A}]
 - [Deep dive into {TOPIC_B} alone with /last30days {TOPIC_B}]
 - [Focus on a specific dimension from the comparison table]
-- [Look at a different time period with --days=7 or --days=90]
+- [Look at a different time period with --period=7d, --period=3m, --period=1y or --from=YYYY-MM-DD]
+- [Focus on a country or region in the Arab world with --region=uae, --region=jordan, --region=gcc or --region=mena]
 ```
 
 **If QUERY_TYPE = GENERAL:**

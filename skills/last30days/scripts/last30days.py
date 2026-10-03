@@ -51,7 +51,7 @@ if os.name == "nt":
 SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from lib import competitors as competitors_mod, corpus, dates, discovery_handoff, env, freshness, html_render, http, permission_preflight, pipeline, reddit, registers, render, schema, ui, x_envelope
+from lib import competitors as competitors_mod, corpus, dates, discovery_handoff, env, freshness, html_render, http, permission_preflight, pipeline, reddit, region, registers, render, schema, ui, x_envelope
 
 _child_pids: set[int] = set()
 _child_pids_lock = threading.Lock()
@@ -121,6 +121,45 @@ def parse_as_of_date_arg(value: str) -> str:
     except ValueError as exc:
         raise argparse.ArgumentTypeError(str(exc)) from exc
     return parsed
+
+def parse_period_arg(value: str) -> int:
+    try:
+        return dates.parse_period(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
+
+
+def _resolve_period_args(args: argparse.Namespace, config: dict) -> str | None:
+    """Fold --period / --from / LAST30DAYS_DEFAULT_DAYS into args.lookback_days.
+
+    Returns an error message for conflicting flags, else None. When nothing
+    sets a window, lookback_days stays None so each mode keeps its own
+    default (30 for research, 90 for the watchlist).
+    """
+    period = getattr(args, "period", None)
+    from_date = getattr(args, "from_date", None)
+    chosen = [name for name, value in (
+        ("--days", args.lookback_days), ("--period", period), ("--from", from_date),
+    ) if value is not None]
+    if len(chosen) > 1:
+        return f"Use only one of {', '.join(chosen)} to set the research window."
+    if period is not None:
+        args.lookback_days = period
+    elif from_date is not None:
+        end = args.as_of_date or datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+        try:
+            args.lookback_days = dates.days_between(from_date, end)
+        except ValueError as exc:
+            return str(exc)
+    elif args.lookback_days is None:
+        default_days = str(config.get("LAST30DAYS_DEFAULT_DAYS") or "").strip()
+        if default_days:
+            try:
+                args.lookback_days = dates.parse_period(default_days)
+            except ValueError as exc:
+                return f"LAST30DAYS_DEFAULT_DAYS: {exc}"
+    return None
+
 
 def resolve_requested_sources(args_search: str | None, config: dict) -> list[str] | None:
     """Resolve the requested source set: explicit --search wins, then the
@@ -833,6 +872,35 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="Number of days to look back for research (default: 30, watchlist uses 90)",
+    )
+    parser.add_argument(
+        "--period",
+        type=parse_period_arg,
+        default=None,
+        help=(
+            "Research window as a duration instead of a day count: 7d, 2w, 3m, 6m, 1y, "
+            "or week / month / quarter / year (Arabic أسبوع / شهر / سنة also work). "
+            "Months count as 30 days."
+        ),
+    )
+    parser.add_argument(
+        "--from",
+        dest="from_date",
+        type=parse_as_of_date_arg,
+        help=(
+            "Start date (YYYY-MM-DD) for a custom window. The window ends today, "
+            "or at --as-of when given. Example: --from 2026-01-01 --as-of 2026-03-31."
+        ),
+    )
+    parser.add_argument(
+        "--region",
+        help=(
+            "Middle East / Arab-world focus: adds that region's subreddits and a second web "
+            "pass over its national and pan-Arab news sites, and sets country defaults. "
+            "Country codes or names (ae, uae, dubai, jo, jordan, sa, eg, ...) or groups "
+            "(gcc, levant, maghreb, north-africa, mena). Comma-separate to combine: "
+            "--region uae,jordan. Default: LAST30DAYS_REGION."
+        ),
     )
     parser.add_argument(
         "--as-of",
@@ -3204,6 +3272,16 @@ def _main(
     config = env.get_config(policy=_config_policy_for_args(args, topic, extra_argv))
     if args.perplexity_search_type is not None:
         config["LAST30DAYS_PERPLEXITY_SEARCH_TYPE"] = args.perplexity_search_type
+    period_error = _resolve_period_args(args, config)
+    if period_error:
+        sys.stderr.write(f"[last30days] {period_error}\n")
+        return 2
+    try:
+        region_focus = region.parse_region(args.region or config.get("LAST30DAYS_REGION"))
+    except ValueError as exc:
+        sys.stderr.write(f"[last30days] --region: {exc}\n")
+        return 2
+    region.apply_region(config, region_focus)
     # One memo per command: comparison mode runs pipeline.run per entity in
     # parallel, so the reset must not live inside the pipeline.
     http.reset_reddit_keyless_memo()
@@ -3759,6 +3837,9 @@ def _main(
     try:
         x_related = [h.strip() for h in args.x_related.split(",") if h.strip()] if args.x_related else None
         subreddits = [s.strip().removeprefix("r/") for s in args.subreddits.split(",") if s.strip()] if args.subreddits else None
+        subreddits = region.merge_subreddits(subreddits, config.get("_region"))
+        if config.get("_region") is not None:
+            sys.stderr.write(f"[last30days] {region.describe(config['_region'])}\n")
         dedicated_subreddits = [s.strip().removeprefix("r/") for s in args.dedicated_subreddits.split(",") if s.strip()] if args.dedicated_subreddits else None
         tiktok_hashtags = [h.strip().lstrip("#") for h in args.tiktok_hashtags.split(",") if h.strip()] if args.tiktok_hashtags else None
         tiktok_creators = [c.strip().lstrip("@") for c in args.tiktok_creators.split(",") if c.strip()] if args.tiktok_creators else None

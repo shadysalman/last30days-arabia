@@ -38,6 +38,8 @@ npx skills add mvanhorn/last30days-skill -g
 
 More install options (claude.ai web, OpenClaw, manual) in the [Install](#install) section below.
 
+**Middle East & Arabic edition:** this fork adds `--region` (UAE, Jordan, Saudi, GCC, Levant, MENA...), Arabic-language topics, and research windows beyond 30 days (`--period`, `--from`). See [MIDDLE_EAST.md](MIDDLE_EAST.md) ([العربية](MIDDLE_EAST.md#النسخة-العربية)).
+
 Zero config. Reddit, HN, Polymarket, and GitHub work immediately. Run it once and the setup wizard unlocks X, YouTube, TikTok, arXiv, Techmeme, and more in 30 seconds.
 
 ---

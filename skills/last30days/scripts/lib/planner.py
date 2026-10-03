@@ -7,7 +7,7 @@ import re
 import unicodedata
 from collections import Counter
 
-from . import categories, competitors, entity_extract, http, log, providers, query, relevance, schema
+from . import arabic, categories, competitors, entity_extract, http, log, providers, query, relevance, schema
 
 # Hebrew Unicode block: U+0590–U+05FF
 _HEBREW_RE = re.compile(r'[\u0590-\u05FF]')
@@ -16,8 +16,12 @@ DISCOVERY_SOURCE_ORDER = ("reddit", "hackernews", "digg", "x")
 
 
 def detect_language(text: str) -> str | None:
-    """Return 'he' if the text contains Hebrew characters, else None."""
-    return 'he' if _HEBREW_RE.search(text) else None
+    """Return 'he' for Hebrew, 'ar' for Arabic-script text, else None."""
+    if _HEBREW_RE.search(text):
+        return 'he'
+    if arabic.has_arabic(text):
+        return 'ar'
+    return None
 
 
 def build_discovery_plan(
@@ -675,10 +679,11 @@ def _fallback_plan(
     note: str = "fallback-plan",
 ) -> schema.QueryPlan:
     intent = _infer_intent(topic)
-    # Hebrew-language topics: elevate web search (grounding) to the front of
-    # the source list since Reddit/HN/GitHub are English-dominant platforms.
-    # Grounding covers Ynet, Walla, Mako, N12 etc. if a web search key is set.
-    if detect_language(topic) == 'he' and 'grounding' in available_sources:
+    # Hebrew- and Arabic-language topics: elevate web search (grounding) to the
+    # front of the source list since Reddit/HN/GitHub are English-dominant
+    # platforms. Grounding covers Ynet/Walla/N12 for Hebrew and Al Jazeera,
+    # Al Arabiya, Gulf News, Al Ghad etc. for Arabic if a web search key is set.
+    if detect_language(topic) in ('he', 'ar') and 'grounding' in available_sources:
         ordered = ['grounding'] + [s for s in available_sources if s != 'grounding']
         available_sources = ordered
         if requested_sources:

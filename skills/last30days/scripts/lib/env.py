@@ -654,6 +654,12 @@ def get_config(policy: ConfigLoadPolicy | None = None) -> dict[str, Any]:
         # per-topic state, and env keys ride through the competitor runner's
         # config copy, which would attach one brand's ads to every peer.
         ('LAST30DAYS_META_ADS_COUNTRY', 'US'),
+        # Default --region (e.g. "uae", "uae,jordan", "gcc", "mena") applied to
+        # every run when no --region flag is passed. See lib/region.py.
+        ('LAST30DAYS_REGION', None),
+        # Default research window when no --days/--period/--from is passed,
+        # in --period syntax ("30", "7d", "3m", "1y"). Unset keeps 30 days.
+        ('LAST30DAYS_DEFAULT_DAYS', None),
         # Host-native search signal: set by the SKILL.md agent-host path when the
         # invoking runtime has its own (better) web-search tool, so the engine's
         # keyless search floor stays off there. Defaults unset -> floor allowed.

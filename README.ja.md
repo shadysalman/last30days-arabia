@@ -40,6 +40,8 @@ npx skills add mvanhorn/last30days-skill -g
 
 設定は不要です。Reddit、HN、Polymarket、GitHub はすぐに使えます。一度実行すれば、セットアップウィザードが30秒で X、YouTube、TikTok、arXiv、Techmeme などを有効にします。
 
+**Middle East & Arabic edition:** this fork adds `--region` (UAE, Jordan, Saudi, GCC, Levant, MENA...), Arabic-language topics, and research windows beyond 30 days (`--period`, `--from`). See [MIDDLE_EAST.md](MIDDLE_EAST.md) ([العربية](MIDDLE_EAST.md#النسخة-العربية)).
+
 ---
 
 Reddit のアップボート。X のいいね。YouTube の文字起こし。TikTok のエンゲージメント。実際のお金とインサイダー情報に裏打ちされた Polymarket のオッズ。つまり、毎日何百万人もの人が自分の注意と財布で投票しているということです。/last30days はそのすべてを並行して検索し、実際に人々が反応したかどうかでスコアを付け、AIエージェントが判定役となって1本のブリーフにまとめます。

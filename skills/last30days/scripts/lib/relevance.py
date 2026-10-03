@@ -9,7 +9,7 @@ The score is intentionally query-centric:
 import re
 from typing import List, Optional, Set
 
-from . import cjk
+from . import arabic, cjk
 
 # Stopwords for relevance computation (common English words that dilute token overlap)
 STOPWORDS = frozenset({
@@ -25,7 +25,7 @@ STOPWORDS = frozenset({
     'איך', 'למה', 'כמה', 'היה', 'הייתה', 'היו', 'יהיה', 'יהיו',
     # Hebrew definite article / prefixes appearing as standalone tokens after split
     'ה', 'ב', 'ל', 'מ', 'כ', 'ו', 'ש',
-}) | cjk.CHINESE_STOPWORDS
+}) | cjk.CHINESE_STOPWORDS | arabic.ARABIC_STOPWORDS
 
 # Shared relevance-ranking thresholds for the Reddit pipelines (keyed + keyless).
 # Single source of truth so both paths apply identical thresholds to the same
@@ -94,9 +94,10 @@ def tokenize(text: str) -> Set[str]:
 
     Chinese text is segmented via cjk.segment (jieba or character bigrams) so
     overlap scoring works on Chinese sources; ASCII text keeps the original
-    whitespace path.
+    whitespace path. Arabic text is orthographically normalized first so
+    spelling variants (أ/ا, ة/ه, diacritics) score as the same token.
     """
-    words = cjk.segment(text)
+    words = cjk.segment(arabic.normalize(text))
     tokens = {w for w in words if w not in STOPWORDS and len(w) > 1}
     expanded = set(tokens)
     for t in tokens:
@@ -107,7 +108,7 @@ def tokenize(text: str) -> Set[str]:
 
 def _normalize_phrase(text: str) -> str:
     """Normalize text for phrase containment checks."""
-    return ' '.join(re.sub(r'[^\w\s]', ' ', text.lower()).split())
+    return ' '.join(re.sub(r'[^\w\s]', ' ', arabic.normalize(text).lower()).split())
 
 
 class PreparedQuery:

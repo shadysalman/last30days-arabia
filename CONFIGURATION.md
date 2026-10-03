@@ -412,6 +412,36 @@ LAST30DAYS_DEFAULT_SEARCH=reddit,x,youtube,hn
 
 Accepts the same comma-separated names and aliases as `--search` (`web` → grounding, `hn` → hackernews, `bsky` → bluesky, `xhs` → xiaohongshu). Precedence: an explicit `--search` on the command line always wins; `LAST30DAYS_DEFAULT_SEARCH` applies only when the flag is omitted; when neither is set, per-query behavior is unchanged. `INCLUDE_SOURCES` / `EXCLUDE_SOURCES` keep their existing additive/subtractive roles on whichever set is selected.
 
+### Middle East region (`LAST30DAYS_REGION`, `--region`)
+
+`--region` focuses a run on one or more Arab-world countries. Values are comma-separated and case-insensitive:
+
+| Kind | Values |
+|------|--------|
+| GCC | `ae` / `uae` / `dubai` / `abu-dhabi`, `sa` / `saudi` / `ksa`, `qa` / `qatar`, `kw` / `kuwait`, `bh` / `bahrain`, `om` / `oman` |
+| Levant & Iraq | `jo` / `jordan` / `amman`, `lb` / `lebanon`, `ps` / `palestine`, `sy` / `syria`, `iq` / `iraq` |
+| North Africa | `eg` / `egypt`, `ly` / `libya`, `tn` / `tunisia`, `dz` / `algeria`, `ma` / `morocco`, `sd` / `sudan` |
+| Other | `ye` / `yemen` |
+| Groups | `gcc` (`gulf`), `levant`, `maghreb`, `north-africa`, `mena` (`arab`, `arab-world`, `middle-east`) = every country above |
+
+Effects:
+
+- **Reddit:** the country's subreddits (e.g. r/dubai, r/UAE, r/abudhabi for `uae`; r/jordan, r/amman for `jordan`) plus r/arabs and r/MiddleEast are searched in addition to the global search and any `--subreddits` you pass. Groups use each country's main subreddit, capped at 8.
+- **Web:** when a web backend is active (Brave, Exa, Serper, Parallel or the keyless floor), each web query runs a second pass restricted to the region's national and pan-Arab news sites (`site:` OR filter; Exa uses `includeDomains`). Capped at 10 domains. The regional pass is best-effort and never fails the source.
+- **Country defaults:** a single-country region sets `LAST30DAYS_PERPLEXITY_COUNTRY` (unless you set it) and `LAST30DAYS_META_ADS_COUNTRY` (unless you changed it from `US`).
+
+`LAST30DAYS_REGION` in `.env` applies a region to every run; `--region` overrides it. Arabic topics are detected automatically with or without `--region`: they are orthographically normalized (أ/إ/آ→ا, ة→ه, ى→ي, diacritics and tatweel removed) for relevance scoring and de-duplication, Arabic stopwords are ignored, and web search is moved to the front of the fallback plan.
+
+### Research window (`--days`, `--period`, `--from`, `LAST30DAYS_DEFAULT_DAYS`)
+
+The default window is 30 days (90 for the watchlist). Pick exactly one of:
+
+- `--days N` - a day count.
+- `--period` - a duration: `7d`, `2w`, `3m`, `6m`, `1y`, `24h`, `6 months`, or `week` / `fortnight` / `month` / `quarter` / `half-year` / `year` (Arabic `أسبوع` / `أسبوعين` / `شهر` / `ربع` / `سنة` also work). Months are 30 days, years 365, capped at 3650.
+- `--from YYYY-MM-DD` - a start date; the window ends today, or at `--as-of YYYY-MM-DD` when given.
+
+`--as-of` moves the end of any window into the past. `LAST30DAYS_DEFAULT_DAYS` (in `--period` syntax, e.g. `90` or `3m`) replaces the 30-day default when no window flag is passed. Long windows shift the mix toward web and news: most social search APIs rank recent posts first, so a one-year window returns fewer Reddit/X/TikTok items per day than a one-week window.
+
 ### Audience register (`LAST30DAYS_REGISTER`)
 
 The default standard brief stays balanced and byte-compatible with prior releases. To keep a named audience preset across runs, set one of the supported values:

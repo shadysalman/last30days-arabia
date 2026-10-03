@@ -1,0 +1,1 @@
+Flexible research windows beyond 30 days: `--period` accepts `7d`, `2w`, `3m`, `6m`, `1y` or `week` / `month` / `quarter` / `year` (and Arabic أسبوع / شهر / سنة), `--from YYYY-MM-DD` sets a start date (ending today or at `--as-of`), and `LAST30DAYS_DEFAULT_DAYS` sets a persistent default.

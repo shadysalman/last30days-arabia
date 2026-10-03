@@ -43,6 +43,8 @@ npx skills add mvanhorn/last30days-skill -g
 
 开箱即用。Reddit、Hacker News、Polymarket 和 GitHub 无需配置即可搜索。首次运行时，配置向导会在 30 秒内帮你解锁 X、YouTube、TikTok、arXiv、Techmeme 等更多来源。
 
+**Middle East & Arabic edition:** this fork adds `--region` (UAE, Jordan, Saudi, GCC, Levant, MENA...), Arabic-language topics, and research windows beyond 30 days (`--period`, `--from`). See [MIDDLE_EAST.md](MIDDLE_EAST.md) ([العربية](MIDDLE_EAST.md#النسخة-العربية)).
+
 ---
 
 Reddit 的赞同票、X 的点赞、YouTube 的完整字幕、TikTok 的互动数据，以及由真金白银和内幕信息支撑的 Polymarket 概率——每天都有数百万人用注意力和钱包投票。`/last30days` 会并行搜索这些平台，按照真实用户的参与度评分，再由 AI 智能体裁判综合成一份简报。

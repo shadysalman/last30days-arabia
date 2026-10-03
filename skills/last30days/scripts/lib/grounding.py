@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from urllib.parse import urlparse
 
-from . import dates, env, http, parallel_mcp, schema, web_search_keyless
+from . import dates, env, http, parallel_mcp, region, schema, web_search_keyless
 
 
 @dataclass(frozen=True)
@@ -86,18 +86,22 @@ def brave_search(
 
 def exa_search(
     query: str, date_range: tuple[str, str], api_key: str, count: int = 5,
+    include_domains: list[str] | None = None,
 ) -> tuple[list[dict], dict]:
+    payload = {
+        "query": query,
+        "type": "auto",
+        "numResults": count,
+        "startPublishedDate": f"{date_range[0]}T00:00:00.000Z",
+        "endPublishedDate": f"{date_range[1]}T23:59:59.999Z",
+        "contents": {"text": {"maxCharacters": 2000}},
+    }
+    if include_domains:
+        payload["includeDomains"] = list(include_domains)
     data = http.request(
         "POST", "https://api.exa.ai/search",
         headers={"x-api-key": api_key},
-        json_data={
-            "query": query,
-            "type": "auto",
-            "numResults": count,
-            "startPublishedDate": f"{date_range[0]}T00:00:00.000Z",
-            "endPublishedDate": f"{date_range[1]}T23:59:59.999Z",
-            "contents": {"text": {"maxCharacters": 2000}},
-        },
+        json_data=payload,
         timeout=15,
     )
     items = []
@@ -246,6 +250,32 @@ def web_search(
             backend = "keyless"
         else:
             return [], {}
+    if backend == "none":
+        return [], {}
+    items, artifact = _search_backend(query, date_range, config, backend)
+    focus = config.get("_region")
+    if isinstance(focus, region.RegionFocus) and focus.news_domains:
+        items, artifact = _merge_regional_pass(
+            query, date_range, config, backend, focus, items, artifact)
+    if items and not _reddit_excluded(config):
+        # Reddit enrichment is a best-effort secondary fetch on already-retrieved
+        # web results. Isolate its HTTP failures in a throwaway capture sink so a
+        # reddit.com fetch failure (e.g. a 403 on a datacenter IP) is not
+        # attributed to the web/grounding source itself — which would otherwise
+        # discard the successfully retrieved results and report the source failed.
+        with http.capture_failures():
+            items = _enrich_reddit_items(items)
+    return items, artifact
+
+
+def _search_backend(
+    query: str,
+    date_range: tuple[str, str],
+    config: dict,
+    backend: str,
+    include_domains: list[str] | None = None,
+) -> tuple[list[dict], dict]:
+    """Run one query against one resolved backend."""
     items: list[dict] = []
     artifact: dict = {}
     if backend == "brave":
@@ -257,7 +287,8 @@ def web_search(
         key = config.get("EXA_API_KEY")
         if not key:
             raise RuntimeError("EXA_API_KEY is required when web_backend='exa'")
-        items, artifact = exa_search(query, date_range, key)
+        items, artifact = exa_search(
+            query, date_range, key, include_domains=include_domains)
     elif backend == "serper":
         key = config.get("SERPER_API_KEY")
         if not key:
@@ -274,19 +305,54 @@ def web_search(
         )
     elif backend == "keyless":
         items, artifact = web_search_keyless.keyless_search(query, date_range, config)
-    elif backend != "none":
-        raise ValueError(f"Unsupported web backend: {backend!r}")
     else:
-        return [], {}
-    if items and not _reddit_excluded(config):
-        # Reddit enrichment is a best-effort secondary fetch on already-retrieved
-        # web results. Isolate its HTTP failures in a throwaway capture sink so a
-        # reddit.com fetch failure (e.g. a 403 on a datacenter IP) is not
-        # attributed to the web/grounding source itself — which would otherwise
-        # discard the successfully retrieved results and report the source failed.
-        with http.capture_failures():
-            items = _enrich_reddit_items(items)
+        raise ValueError(f"Unsupported web backend: {backend!r}")
     return items, artifact
+
+
+def _merge_regional_pass(
+    query: str,
+    date_range: tuple[str, str],
+    config: dict,
+    backend: str,
+    focus: region.RegionFocus,
+    items: list[dict],
+    artifact: dict,
+) -> tuple[list[dict], dict]:
+    """Add a second web pass restricted to the region's news sites.
+
+    Global web search ranks English/US outlets first, so Gulf News, Al Ghad
+    or Asharq coverage of the same story rarely makes the top five. The
+    regional pass is best-effort: a failure keeps the global results.
+    """
+    domains = list(focus.news_domains)
+    if backend == "exa":
+        regional_query, include = query, domains
+    else:
+        regional_query, include = region.regional_web_query(query, focus), None
+    try:
+        regional_items, regional_artifact = _search_backend(
+            regional_query, date_range, config, backend, include_domains=include)
+    except Exception as exc:  # noqa: BLE001 - regional pass must never sink the source
+        sys.stderr.write(f"[Web] Regional pass failed ({type(exc).__name__}: {exc})\n")
+        return items, artifact
+    seen = {item.get("url") for item in items}
+    merged = list(items)
+    for index, item in enumerate(regional_items, start=1):
+        if item.get("url") in seen:
+            continue
+        seen.add(item.get("url"))
+        item = dict(item)
+        item["id"] = f"WR{index}"
+        item["why_relevant"] = f"{item.get('why_relevant') or 'Web search'} (regional: {', '.join(focus.names)})"
+        merged.append(item)
+    merged_artifact = dict(artifact or {})
+    queries = list(merged_artifact.get("webSearchQueries") or [])
+    queries.extend((regional_artifact or {}).get("webSearchQueries") or [regional_query])
+    merged_artifact["webSearchQueries"] = queries
+    merged_artifact["resultCount"] = len(merged)
+    merged_artifact.setdefault("label", (regional_artifact or {}).get("label", backend))
+    return merged, merged_artifact
 
 
 def _reddit_excluded(config: dict) -> bool:

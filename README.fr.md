@@ -40,6 +40,8 @@ D'autres options d'installation (claude.ai web, OpenClaw, manuelle) dans la sect
 
 Zéro configuration. Reddit, HN, Polymarket et GitHub fonctionnent immédiatement. Lancez la skill une fois : l'assistant de configuration débloque X, YouTube, TikTok, arXiv, Techmeme et d'autres sources en 30 secondes.
 
+**Middle East & Arabic edition:** this fork adds `--region` (UAE, Jordan, Saudi, GCC, Levant, MENA...), Arabic-language topics, and research windows beyond 30 days (`--period`, `--from`). See [MIDDLE_EAST.md](MIDDLE_EAST.md) ([العربية](MIDDLE_EAST.md#النسخة-العربية)).
+
 ---
 
 Les upvotes de Reddit. Les likes de X. Les transcriptions YouTube. L'engagement TikTok. Les cotes Polymarket, adossées à de l'argent réel et à des informations d'initiés. Ce sont des millions de personnes qui votent chaque jour avec leur attention et leur portefeuille. /last30days interroge tout cela en parallèle, classe les résultats selon ce avec quoi les gens interagissent vraiment, et un agent IA joue le rôle de juge pour en tirer un seul brief.

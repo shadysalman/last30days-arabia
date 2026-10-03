@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from . import cjk, schema
+from . import arabic, cjk, schema
 
 STOPWORDS = frozenset(
     {
@@ -35,7 +35,7 @@ STOPWORDS = frozenset(
 
 
 def normalize_text(text: str) -> str:
-    text = re.sub(r"[^\w\s]", " ", text.lower())
+    text = re.sub(r"[^\w\s]", " ", arabic.normalize(text).lower())
     return re.sub(r"\s+", " ", text).strip()
 
 

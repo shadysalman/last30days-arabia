@@ -4,6 +4,8 @@ extraction, and compound term detection. Used by all search modules."""
 import re
 from typing import FrozenSet, List, Optional, Set
 
+from . import arabic
+
 # Common multi-word prefixes stripped from all queries (identical across modules)
 PREFIXES = [
     'what are the best', 'what is the best', 'what are the latest',
@@ -14,6 +16,8 @@ PREFIXES = [
     'מה יש חדש ב', 'מה יש חדש על', 'מה אנשים אומרים על',
     'מה חדש ב', 'מה חדש על', 'איך להשתמש ב',
     'מהם המוצרים של', 'מה הם', 'מהם',
+    # Arabic question/meta prefixes
+    *arabic.ARABIC_PREFIXES,
 ]
 
 # Multi-word suffixes (used by bird_x)
@@ -51,7 +55,7 @@ NOISE_WORDS = frozenset({
     'יש', 'אין', 'כבר', 'רק', 'גם', 'אבל', 'כך', 'זה', 'זו',
     'חדש', 'חדשים', 'טוב', 'טובים', 'הכי', 'ביותר',
     'מוצרים', 'מבצע', 'מבצעים', 'חדשות', 'עדכונים',
-})
+}) | arabic.ARABIC_NOISE_WORDS
 
 
 # Shared noise sets for adapter `_extract_core_subject` wrappers.

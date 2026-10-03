@@ -24,6 +24,8 @@ permissions: {}
 
 jobs:
   prepare:
+    # Releases are published from the upstream repo only; this fork installs from main.
+    if: github.repository == 'mvanhorn/last30days-skill'
     runs-on: ubuntu-latest
     permissions:
       contents: write

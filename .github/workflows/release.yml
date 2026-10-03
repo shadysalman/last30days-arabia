@@ -24,6 +24,8 @@ jobs:
   # surface). Unchanged from prior versions; just isolated into its own job
   # so the .mcpb matrix can run in parallel.
   build-skill:
+    # Releases are published from the upstream repo only; this fork installs from main.
+    if: github.repository == 'mvanhorn/last30days-skill'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -57,6 +59,8 @@ jobs:
   # package each as a .mcpb. MCPB v0.3 is a ZIP containing the checked-in
   # manifest and the pre-built binary at the manifest's entry point.
   build-mcpb:
+    # Releases are published from the upstream repo only; this fork installs from main.
+    if: github.repository == 'mvanhorn/last30days-skill'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -142,6 +146,8 @@ jobs:
 
   # Gather every platform artifact and attach to one GitHub release.
   release:
+    # Releases are published from the upstream repo only; this fork installs from main.
+    if: github.repository == 'mvanhorn/last30days-skill'
     needs: [build-skill, build-mcpb]
     runs-on: ubuntu-latest
     permissions:
